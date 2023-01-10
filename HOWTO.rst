@@ -1176,11 +1176,11 @@ I/O type
 			Generate the same offset.
 
 	``sequential`` is only useful for random I/O, where fio would normally
-	generate a new random offset for every I/O. If you append e.g. 8 to randread,
-	you would get a new random offset for every 8 I/Os. The result would be a
-	seek for only every 8 I/Os, instead of for every I/O. Use ``rw=randread:8``
-	to specify that. As sequential I/O is already sequential, setting
-	``sequential`` for that would not result in any differences.  ``identical``
+	generate a new random offset for every I/O. If you append e.g. 8 to
+	randread, i.e. ``rw=randread:8`` you would get a new random offset for
+	every 8 I/Os. The result would be one single random offset and 7
+	sequential offset. As sequential I/O is already sequential, setting
+	``sequential`` for that would not result in any difference.  ``identical``
 	behaves in a similar fashion, except it sends the same offset 8 number of
 	times before generating a new offset.
 
