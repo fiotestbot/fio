@@ -62,6 +62,9 @@ struct fio_zone_info {
  * @nr_zones: number of zones
  * @refcount: number of fio files that share this structure
  * @num_open_zones: number of open zones
+ * @wp_zones_size: total size of all zones with write pointers in bytes.
+ * @wp_zones_written_size: total size written to all zones with write pointers
+ *                         in bytes.
  * @write_cnt: Number of writes since the latest zone reset triggered by
  *	       the zone_reset_frequency fio job parameter.
  * @open_zones: zone numbers of open zones
@@ -82,6 +85,8 @@ struct zoned_block_device_info {
 	uint32_t		nr_zones;
 	uint32_t		refcount;
 	uint32_t		num_open_zones;
+	uint64_t		wp_zones_size;
+	uint64_t		wp_zones_written_size;
 	uint32_t		write_cnt;
 	uint32_t		open_zones[ZBD_MAX_OPEN_ZONES];
 	struct fio_zone_info	zone_info[0];

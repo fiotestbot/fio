@@ -288,6 +288,7 @@ static int zbd_reset_zone(struct thread_data *td, struct fio_file *f,
 	pthread_mutex_lock(&f->zbd_info->mutex);
 	f->zbd_info->sectors_with_data -= data_in_zone;
 	f->zbd_info->wp_sectors_with_data -= data_in_zone;
+	f->zbd_info->wp_zones_written_size -= data_in_zone;
 	pthread_mutex_unlock(&f->zbd_info->mutex);
 
 	z->wp = z->start;
@@ -756,6 +757,7 @@ static int init_zone_info(struct thread_data *td, struct fio_file *f)
 	f->zbd_info->zone_size_log2 = is_power_of_2(zone_size) ?
 		ilog2(zone_size) : 0;
 	f->zbd_info->nr_zones = nr_zones;
+	f->zbd_info->wp_zones_size = nr_zones * zone_size;
 	return 0;
 }
 
@@ -834,6 +836,9 @@ static int parse_zone_info(struct thread_data *td, struct fio_file *f)
 			switch (z->type) {
 			case ZBD_ZONE_TYPE_SWR:
 				p->has_wp = 1;
+				zbd_info->wp_zones_size += zone_size;
+				zbd_info->wp_zones_written_size +=
+					p->wp - p->start;
 				break;
 			default:
 				p->has_wp = 0;
@@ -1643,6 +1648,7 @@ static void zbd_queue_io(struct thread_data *td, struct io_u *io_u, int q,
 		if (z->wp <= zone_end) {
 			zbd_info->sectors_with_data += zone_end - z->wp;
 			zbd_info->wp_sectors_with_data += zone_end - z->wp;
+			zbd_info->wp_zones_written_size += zone_end - z->wp;
 		}
 		pthread_mutex_unlock(&zbd_info->mutex);
 		z->wp = zone_end;
@@ -1999,7 +2005,8 @@ retry:
 
 		/* Check whether the zone reset threshold has been exceeded */
 		if (td->o.zrf.u.f) {
-			if (zbdi->wp_sectors_with_data >= f->io_size * td->o.zrt.u.f &&
+			if (zbdi->wp_zones_written_size >=
+			    zbdi->wp_zones_size * td->o.zrt.u.f &&
 			    zbd_dec_and_reset_write_cnt(td, f))
 				zb->reset_zone = 1;
 		}
