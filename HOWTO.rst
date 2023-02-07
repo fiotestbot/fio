@@ -1088,7 +1088,8 @@ Target file/device
 	A number between zero and one that indicates the ratio of written bytes
 	to the total size of the zones with write pointers in the IO range. When
 	current ratio is above this ratio, zones are reset periodically as
-	:option:`zone_reset_frequency` specifies.
+	:option:`zone_reset_frequency` specifies. If there are multiple jobs when
+	using this option, the IO range for all write jobs shall be the same.
 
 .. option:: zone_reset_frequency=float
 
