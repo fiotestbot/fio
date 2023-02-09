@@ -2192,6 +2192,14 @@ cached data. Currently the RWF_NOWAIT flag does not supported for cached write.
 For direct I/O, requests will only succeed if cache invalidation isn't required,
 file blocks are fully allocated and the disk request could be issued immediately.
 .TP
+.BI (io_uring_cmd)fdp \fR=\fPbool
+Enable Flexible Data Placement mode for write commands.
+.TP
+.BI (io_uring_cmd)fdp_pli \fR=\fPint[,int][,int]
+Select which Placement ID Index/Indicies this job is allowed to use for writes.
+By default, the job will cycle through all available Placement IDs, so use this
+to isolate these identifiers to specific jobs.
+.TP
 .BI (cpuio)cpuload \fR=\fPint
 Attempt to use the specified percentage of CPU cycles. This is a mandatory
 option when using cpuio I/O engine.

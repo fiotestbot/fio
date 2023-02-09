@@ -1417,6 +1417,12 @@ done:
 
 	td_restore_runstate(td, old_state);
 
+	if (td->o.fdp) {
+		err = fdp_init(td);
+		if (err)
+			goto err_out;
+	}
+
 	return 0;
 
 err_offset:
@@ -1627,6 +1633,7 @@ void close_and_free_files(struct thread_data *td)
 		}
 
 		zbd_close_file(f);
+		fdp_free_ruhs_info(f);
 		fio_file_free(f);
 	}
 
