@@ -21,8 +21,13 @@ int fio_nvme_uring_cmd_prep(struct nvme_uring_cmd *cmd, struct io_u *io_u,
 	else
 		return -ENOTSUP;
 
-	slba = io_u->offset >> data->lba_shift;
-	nlb = (io_u->xfer_buflen >> data->lba_shift) - 1;
+	if (data->lba_ext) {
+		slba = io_u->offset / data->lba_ext;
+		nlb = (io_u->xfer_buflen / data->lba_ext) - 1;
+	} else {
+		slba = io_u->offset >> data->lba_shift;
+		nlb = (io_u->xfer_buflen >> data->lba_shift) - 1;
+	}
 
 	/* cdw10 and cdw11 represent starting lba */
 	cmd->cdw10 = slba & 0xffffffff;
@@ -65,8 +70,13 @@ int fio_nvme_trim(const struct thread_data *td, struct fio_file *f,
 	struct nvme_dsm_range dsm;
 	int ret;
 
-	dsm.nlb = (len >> data->lba_shift);
-	dsm.slba = (offset >> data->lba_shift);
+	if (data->lba_ext) {
+		dsm.nlb = len / data->lba_ext;
+		dsm.slba = offset / data->lba_ext;
+	} else {
+		dsm.nlb = len >> data->lba_shift;
+		dsm.slba = offset >> data->lba_shift;
+	}
 
 	ret = nvme_trim(f->fd, data->nsid, 1, sizeof(struct nvme_dsm_range),
 			&dsm);
@@ -94,11 +104,12 @@ static int nvme_identify(int fd, __u32 nsid, enum nvme_identify_cns cns,
 }
 
 int fio_nvme_get_info(struct fio_file *f, __u32 *nsid, __u32 *lba_sz,
-		      __u64 *nlba)
+		      __u32 *ms, __u64 *nlba)
 {
 	struct nvme_id_ns ns;
 	int namespace_id;
 	int fd, err;
+	__u32 format_idx;
 
 	if (f->filetype != FIO_TYPE_CHAR) {
 		log_err("ioengine io_uring_cmd only works with nvme ns "
@@ -113,9 +124,8 @@ int fio_nvme_get_info(struct fio_file *f, __u32 *nsid, __u32 *lba_sz,
 	namespace_id = ioctl(fd, NVME_IOCTL_ID);
 	if (namespace_id < 0) {
 		err = -errno;
-		log_err("failed to fetch namespace-id");
-		close(fd);
-		return err;
+		log_err("%s: failed to fetch namespace-id\n", f->file_name);
+		goto out;
 	}
 
 	/*
@@ -125,17 +135,42 @@ int fio_nvme_get_info(struct fio_file *f, __u32 *nsid, __u32 *lba_sz,
 	err = nvme_identify(fd, namespace_id, NVME_IDENTIFY_CNS_NS,
 				NVME_CSI_NVM, &ns);
 	if (err) {
-		log_err("failed to fetch identify namespace\n");
+		log_err("%s: failed to fetch identify namespace\n",
+			f->file_name);
 		close(fd);
 		return err;
 	}
 
 	*nsid = namespace_id;
-	*lba_sz = 1 << ns.lbaf[(ns.flbas & 0x0f)].ds;
+
+	if (ns.nlbaf < 16)
+		format_idx = ns.flbas & 0xf;
+	else
+		format_idx = (ns.flbas & 0xf) + (((ns.flbas >> 5) & 0x3) << 4);
+
+	*lba_sz = 1 << ns.lbaf[format_idx].ds;
+
+	/* Only extended LBA can be supported */
+	*ms = le16_to_cpu(ns.lbaf[format_idx].ms);
+	if (*ms && !((ns.flbas >> 4) & 0x1)) {
+		log_err("%s: only extended logical block can be supported\n",
+			f->file_name);
+		err = -ENOTSUP;
+		goto out;
+	}
+
+	/* Check for end to end data protection support */
+	if (ns.dps & 0x3) {
+		log_err("%s: end to end data protection not supported\n",
+			f->file_name);
+		err = -ENOTSUP;
+		goto out;
+	}
 	*nlba = ns.nsze;
 
+out:
 	close(fd);
-	return 0;
+	return err;
 }
 
 int fio_nvme_get_zoned_model(struct thread_data *td, struct fio_file *f,
