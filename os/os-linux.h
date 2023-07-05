@@ -150,6 +150,10 @@ static inline int ioprio_value(int ioprio_class, int ioprio, int ioprio_hint)
 		ioprio;
 }
 
+#define ioprio_class(ioprio)	((ioprio) >> IOPRIO_CLASS_SHIFT)
+#define ioprio_hint(ioprio)	(((ioprio) >> IOPRIO_HINT_SHIFT) & 0x3ff)
+#define ioprio(ioprio)		((ioprio) & 7)
+
 static inline bool ioprio_value_is_class_rt(unsigned int priority)
 {
 	return (priority >> IOPRIO_CLASS_SHIFT) == IOPRIO_CLASS_RT;
