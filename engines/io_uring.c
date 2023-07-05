@@ -158,6 +158,21 @@ static struct fio_option options[] = {
 		.group	= FIO_OPT_G_IOURING,
 	},
 	{
+		.name	= "cmdprio_hint",
+		.lname	= "Asynchronous I/O priority hint",
+		.type	= FIO_OPT_INT,
+		.off1	= offsetof(struct ioring_options,
+				   cmdprio_options.hint[DDIR_READ]),
+		.off2	= offsetof(struct ioring_options,
+				   cmdprio_options.hint[DDIR_WRITE]),
+		.help	= "Set asynchronous IO priority hint",
+		.minval	= IOPRIO_MIN_PRIO_HINT,
+		.maxval	= IOPRIO_MAX_PRIO_HINT,
+		.interval = 1,
+		.category = FIO_OPT_C_ENGINE,
+		.group	= FIO_OPT_G_IOURING,
+	},
+	{
 		.name	= "cmdprio",
 		.lname	= "Asynchronous I/O priority level",
 		.type	= FIO_OPT_INT,
@@ -192,6 +207,12 @@ static struct fio_option options[] = {
 	{
 		.name	= "cmdprio_class",
 		.lname	= "Asynchronous I/O priority class",
+		.type	= FIO_OPT_UNSUPPORTED,
+		.help	= "Your platform does not support I/O priority classes",
+	},
+	{
+		.name	= "cmdprio_hint",
+		.lname	= "Asynchronous I/O priority hint",
 		.type	= FIO_OPT_UNSUPPORTED,
 		.help	= "Your platform does not support I/O priority classes",
 	},
@@ -365,8 +386,8 @@ static int fio_ioring_prep(struct thread_data *td, struct io_u *io_u)
 		/*
 		 * Since io_uring can have a submission context (sqthread_poll)
 		 * that is different from the process context, we cannot rely on
-		 * the IO priority set by ioprio_set() (option prio/prioclass)
-		 * to be inherited.
+		 * the IO priority set by ioprio_set() (options prio, prioclass,
+		 * and priohint) to be inherited.
 		 * td->ioprio will have the value of the "default prio", so set
 		 * this unconditionally. This value might get overridden by
 		 * fio_ioring_cmdprio_prep() if the option cmdprio_percentage or
