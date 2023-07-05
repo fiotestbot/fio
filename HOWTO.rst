@@ -3409,6 +3409,12 @@ Threads, processes and job synchronization
 	priority setting, see I/O engine specific :option:`cmdprio_percentage`
 	and :option:`cmdprio_class` options.
 
+.. option:: priohint=int
+
+	Set the I/O priority hint. See man :manpage:`ionice(1)`. For per-command
+	priority setting, see the I/O engine specific :option:`cmdprio_hint`
+	option.
+
 .. option:: cpus_allowed=str
 
 	Controls the same options as :option:`cpumask`, but accepts a textual
