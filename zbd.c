@@ -922,6 +922,14 @@ static int parse_zone_info(struct thread_data *td, struct fio_file *f)
 	/* a sentinel */
 	zbd_info->zone_info[nr_zones].start = offset;
 
+	ret = blkzoned_get_max_active_zones(td, f,
+					    &zbd_info->max_active_zones);
+	if (ret < 0) {
+		dprint(FD_ZBD, "%s: max_active_zones is not available\n",
+		       f->file_name);
+		zbd_info->max_active_zones = 0;
+	}
+
 	f->zbd_info = zbd_info;
 	f->zbd_info->zone_size = zone_size;
 	f->zbd_info->zone_size_log2 = is_power_of_2(zone_size) ?
