@@ -3,6 +3,8 @@
 
 #include "io_u.h"
 
+#define FDP_MAX_RUHS	128
+
 struct fio_ruhs_info {
 	uint32_t nr_ruhs;
 	uint32_t pli_loc;
