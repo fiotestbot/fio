@@ -2275,6 +2275,16 @@ with the caveat that when used on the command line, they must come after the
 	reads and writes. See :manpage:`ionice(1)`. See also the
 	:option:`prioclass` option.
 
+.. option:: cmdprio_hint=int[,int] : [io_uring] [libaio]
+
+	Set the I/O priority hint to use for I/Os that must be issued with
+	a priority when :option:`cmdprio_percentage` or
+	:option:`cmdprio_bssplit` is set. If not specified when
+	:option:`cmdprio_percentage` or :option:`cmdprio_bssplit` is set,
+	this defaults to 0 (no hint). A single value applies to reads and
+	writes. Comma-separated values may be specified for reads and writes.
+	See also the :option:`priohint` option.
+
 .. option:: cmdprio=int[,int] : [io_uring] [libaio]
 
 	Set the I/O priority value to use for I/Os that must be issued with
@@ -2301,9 +2311,9 @@ with the caveat that when used on the command line, they must come after the
 
 		cmdprio_bssplit=blocksize/percentage:blocksize/percentage
 
-	In this case, each entry will use the priority class and priority
-	level defined by the options :option:`cmdprio_class` and
-	:option:`cmdprio` respectively.
+	In this case, each entry will use the priority class, priority hint
+	and priority level defined by the options :option:`cmdprio_class`,
+        :option:`cmdprio` and :option:`cmdprio_hint` respectively.
 
 	The second accepted format for this option is:
 
@@ -2314,7 +2324,14 @@ with the caveat that when used on the command line, they must come after the
 	accepted format does not restrict all entries to have the same priority
 	class and priority level.
 
-	For both formats, only the read and write data directions are supported,
+	The third accepted format for this option is:
+
+		cmdprio_bssplit=blocksize/percentage/class/level/hint:...
+
+	This is an extension of the second accepted format that allows to also
+	specify a priority hint.
+
+	For all formats, only the read and write data directions are supported,
 	values for trim IOs are ignored. This option is mutually exclusive with
 	the :option:`cmdprio_percentage` option.
 
@@ -3428,7 +3445,8 @@ Threads, processes and job synchronization
 
 	Set the I/O priority hint. This has effects only for devices with
 	features controlled through priority hints (e.g. block devices
-	supporting command duration limits).
+	supporting command duration limits). For per-I/O priority hint
+	setting, see the I/O engine specific :option:`cmdprio_hint` option.
 
 .. option:: cpus_allowed=str
 
