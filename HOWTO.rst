@@ -3424,6 +3424,12 @@ Threads, processes and job synchronization
 	priority setting, see I/O engine specific :option:`cmdprio_percentage`
 	and :option:`cmdprio_class` options.
 
+.. option:: priohint=int
+
+	Set the I/O priority hint. This has effects only for devices with
+	features controlled through priority hints (e.g. block devices
+	supporting command duration limits).
+
 .. option:: cpus_allowed=str
 
 	Controls the same options as :option:`cpumask`, but accepts a textual
