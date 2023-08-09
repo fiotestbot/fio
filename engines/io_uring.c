@@ -1119,6 +1119,7 @@ static int fio_ioring_cmd_open_file(struct thread_data *td, struct fio_file *f)
 						"(LBA data size + Metadata size)\n");
 				else
 					log_err("block size must be a multiple of LBA data size\n");
+				td_verror(td, EINVAL, "fio_ioring_cmd_open_file");
 				return 1;
 			}
                 }
