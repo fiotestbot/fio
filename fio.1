@@ -3782,10 +3782,11 @@ the histogram logs enabled with \fBlog_hist_msec\fR. For each increment
 in coarseness, fio outputs half as many bins. Defaults to 0, for which
 histogram logs contain 1216 latency bins. See \fBLOG FILE FORMATS\fR section.
 .TP
-.BI log_max_value \fR=\fPbool
+.BI log_max_value \fR=\fPint
 If \fBlog_avg_msec\fR is set, fio logs the average over that window. If
-you instead want to log the maximum value, set this option to 1. Defaults to
-0, meaning that averaged values are logged.
+you instead want to log the maximum value, set this option to 1. If you want
+both the average and maximum value, set this option to 2. Defaults to 0,
+meaning that averaged values are logged.
 .TP
 .BI log_offset \fR=\fPbool
 If this is set, the iolog options will include the byte offset for the I/O
@@ -4756,8 +4757,8 @@ time (msec), value, data direction, block size (bytes), offset (bytes),
 command priority
 .RE
 .P
-`Time' for the log entry is always in milliseconds. The `value' logged depends
-on the type of log, it will be one of the following:
+`Time' for the log entry is always in milliseconds. The `value' and `value1'
+logged depends on the type of log, it will be one of the following:
 .RS
 .TP
 .B Latency log
@@ -4798,10 +4799,20 @@ number with the lowest 13 bits indicating the priority value (\fBprio\fR and
 .P
 Fio defaults to logging every individual I/O but when windowed logging is set
 through \fBlog_avg_msec\fR, either the average (by default) or the maximum
-(\fBlog_max_value\fR is set) `value' seen over the specified period of time
-is recorded. Each `data direction' seen within the window period will aggregate
-its values in a separate row. Further, when using windowed logging the `block
-size' and `offset' entries will always contain 0.
+(\fBlog_max_value\fR set to 1) `value' seen over the specified period of time
+is recorded. From fio version 3.37 onwards you can record both the average `value'
+and maximum `value1' (\fBlog_max_value\fR set to 2), and the log file format takes
+this form:
+.RS
+.P
+time (msec), value, value1, data direction, block size (bytes), offset (bytes),
+command priority
+.RE
+.P
+Each `data direction' seen
+within the window period will aggregate its values in a separate row. Further,
+when using windowed logging the `block size' and `offset' entries will always
+contain 0.
 .SH CLIENT / SERVER
 Normally fio is invoked as a stand-alone application on the machine where the
 I/O workload should be generated. However, the backend and frontend of fio can

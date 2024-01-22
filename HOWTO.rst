@@ -4088,11 +4088,12 @@ Measurements and reporting
 	histogram logs contain 1216 latency bins. See :option:`write_hist_log`
 	and `Log File Formats`_.
 
-.. option:: log_max_value=bool
+.. option:: log_max_value=int
 
 	If :option:`log_avg_msec` is set, fio logs the average over that window. If
-	you instead want to log the maximum value, set this option to 1. Defaults to
-	0, meaning that averaged values are logged.
+	you instead want to log the maximum value, set this option to 1. If you
+	want to log both the average and maximum value, set this option to 2.
+	Defaults to 0, meaning that averaged values are logged.
 
 .. option:: log_offset=bool
 
@@ -5062,10 +5063,18 @@ by the ioengine specific :option:`cmdprio_percentage`.
 
 Fio defaults to logging every individual I/O but when windowed logging is set
 through :option:`log_avg_msec`, either the average (by default) or the maximum
-(:option:`log_max_value` is set) *value* seen over the specified period of time
-is recorded. Each *data direction* seen within the window period will aggregate
-its values in a separate row. Further, when using windowed logging the *block
-size* and *offset* entries will always contain 0.
+(:option:`log_max_value` is set to 1) *value* seen over the specified period of time
+is recorded. From fio version 3.37 onwards you can record both the average *value*
+and maximum *value1* (:option:`log_max_value` is set to 2), and the log file format
+takes this form:
+
+    *time* (`msec`), *value*, *value1*, *data direction*, *block size* (`bytes`),
+    *offset* (`bytes`), *command priority*
+
+
+Each *data direction*
+seen within the window period will aggregate its values in a separate row. Further,
+when using windowed logging the *block size* and *offset* entries will always contain 0.
 
 
 Client/Server
