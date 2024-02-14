@@ -943,8 +943,11 @@ static void setup_strided_zone_mode(struct thread_data *td, struct io_u *io_u)
 static int fill_io_u(struct thread_data *td, struct io_u *io_u)
 {
 	bool is_random;
-	uint64_t offset;
+	uint64_t offset, buflen, i = 0;
 	enum io_u_action ret;
+	struct fio_file *f = io_u->file;
+	struct trim_range *range;
+	uint8_t *buf;
 
 	if (td_ioengine_flagged(td, FIO_NOIO))
 		goto out;
@@ -966,22 +969,68 @@ static int fill_io_u(struct thread_data *td, struct io_u *io_u)
 	else if (td->o.zone_mode == ZONE_MODE_ZBD)
 		setup_zbd_zone_mode(td, io_u);
 
-	/*
-	 * No log, let the seq/rand engine retrieve the next buflen and
-	 * position.
-	 */
-	if (get_next_offset(td, io_u, &is_random)) {
-		dprint(FD_IO, "io_u %p, failed getting offset\n", io_u);
-		return 1;
-	}
+	if (multi_range_trim(td, io_u)) {
+		buf = io_u->buf;
+		buflen = 0;
 
-	io_u->buflen = get_next_buflen(td, io_u, is_random);
-	if (!io_u->buflen) {
-		dprint(FD_IO, "io_u %p, failed getting buflen\n", io_u);
-		return 1;
-	}
+		while (i < td->o.num_range) {
+			range = (struct trim_range *)buf;
+			if (get_next_offset(td, io_u, &is_random)) {
+				dprint(FD_IO, "io_u %p, failed getting offset\n",
+				       io_u);
+				break;
+			}
 
+			io_u->buflen = get_next_buflen(td, io_u, is_random);
+			if (!io_u->buflen) {
+				dprint(FD_IO, "io_u %p, failed getting buflen\n", io_u);
+				break;
+			}
+
+			if (io_u->offset + io_u->buflen > io_u->file->real_file_size) {
+				dprint(FD_IO, "io_u %p, off=0x%llx + len=0x%llx exceeds file size=0x%llx\n",
+					io_u,
+					(unsigned long long) io_u->offset, io_u->buflen,
+					(unsigned long long) io_u->file->real_file_size);
+				break;
+			}
+
+			range->start = io_u->offset;
+			range->len = io_u->buflen;
+			buflen += io_u->buflen;
+			f->last_start[io_u->ddir] = io_u->offset;
+			f->last_pos[io_u->ddir] = io_u->offset + range->len;
+
+			buf += sizeof(struct trim_range);
+			i++;
+
+			if (td_random(td) && file_randommap(td, io_u->file))
+				mark_random_map(td, io_u, io_u->offset, io_u->buflen);
+		}
+		if (buflen) {
+			io_u->buflen = buflen;
+			io_u->number_trim = i;
+		} else {
+			return 1;
+		}
+	} else {
+		/*
+		 * No log, let the seq/rand engine retrieve the next buflen and
+		 * position.
+		 */
+		if (get_next_offset(td, io_u, &is_random)) {
+			dprint(FD_IO, "io_u %p, failed getting offset\n", io_u);
+			return 1;
+		}
+
+		io_u->buflen = get_next_buflen(td, io_u, is_random);
+		if (!io_u->buflen) {
+			dprint(FD_IO, "io_u %p, failed getting buflen\n", io_u);
+			return 1;
+		}
+	}
 	offset = io_u->offset;
+
 	if (td->o.zone_mode == ZONE_MODE_ZBD) {
 		ret = zbd_adjust_block(td, io_u);
 		if (ret == io_u_eof) {
@@ -1004,7 +1053,7 @@ static int fill_io_u(struct thread_data *td, struct io_u *io_u)
 	/*
 	 * mark entry before potentially trimming io_u
 	 */
-	if (td_random(td) && file_randommap(td, io_u->file))
+	if (!multi_range_trim(td, io_u) && td_random(td) && file_randommap(td, io_u->file))
 		io_u->buflen = mark_random_map(td, io_u, offset, io_u->buflen);
 
 out:
@@ -1814,7 +1863,7 @@ struct io_u *get_io_u(struct thread_data *td)
 
 	assert(fio_file_open(f));
 
-	if (ddir_rw(io_u->ddir)) {
+	if (ddir_rw(io_u->ddir) && !multi_range_trim(td, io_u)) {
 		if (!io_u->buflen && !td_ioengine_flagged(td, FIO_NOIO)) {
 			dprint(FD_IO, "get_io_u: zero buflen on %p\n", io_u);
 			goto err_put;
