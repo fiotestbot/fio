@@ -197,6 +197,7 @@ struct cmd_iolog_pdu {
 	uint32_t compressed;
 	uint32_t log_offset;
 	uint32_t log_prio;
+	uint32_t log_issue_time;
 	uint32_t log_hist_coarseness;
 	uint32_t per_job_logs;
 	uint8_t name[FIO_NET_NAME_MAX];
