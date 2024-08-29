@@ -328,6 +328,10 @@ static inline int fio_set_sched_idle(void)
 #define RWF_NOWAIT	0x00000008
 #endif
 
+#ifndef RWF_ATOMIC
+#define RWF_ATOMIC	0x00000040
+#endif
+
 #ifndef RWF_UNCACHED
 #define RWF_UNCACHED	0x00000080
 #endif
