@@ -810,9 +810,17 @@ static int fixup_options(struct thread_data *td)
 		       strstr(o->filename_format, "$jobname") &&
 		       strstr(o->filename_format, "$jobnum") &&
 		       strstr(o->filename_format, "$filenum")))) {
-			log_info("fio: multiple writers may overwrite blocks "
-				"that belong to other jobs. This can cause "
-				"verification failures.\n");
+		       if (td->o.oatomic) {
+				log_info("fio: multiple writers may overwrite "
+				"blocks that belong to other jobs. Since in "
+				"atomic writes mode, this should mean no "
+				"verification failures, as errors in "
+				"sequence number will be ignored.\n");
+		       } else {
+				log_info("fio: multiple writers may overwrite "
+				"blocks that belong to other jobs. This can "
+				"cause verification failures.\n");
+			}
 			ret |= warnings_fatal;
 		}
 
