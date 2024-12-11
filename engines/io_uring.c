@@ -104,6 +104,7 @@ struct ioring_options {
 	unsigned int hipri;
 	unsigned int readfua;
 	unsigned int writefua;
+	unsigned int write_stream;
 	unsigned int deac;
 	unsigned int write_mode;
 	unsigned int verify_mode;
@@ -171,6 +172,16 @@ static struct fio_option options[] = {
 		.off1	= offsetof(struct ioring_options, writefua),
 		.help	= "Set FUA flag (force unit access) for all Write operations",
 		.def	= "0",
+		.category = FIO_OPT_C_ENGINE,
+		.group	= FIO_OPT_G_IOURING,
+	},
+	{
+		.name	= "write_stream",
+		.lname	= "Tag write commands with this write stream index",
+		.type	= FIO_OPT_INT,
+		.off1	= offsetof(struct ioring_options, write_stream),
+		.def	= "0",
+		.help	= "Tag this job's write commands with the requested write stream (Default: 0)",
 		.category = FIO_OPT_C_ENGINE,
 		.group	= FIO_OPT_G_IOURING,
 	},
@@ -434,8 +445,11 @@ static int fio_ioring_prep(struct thread_data *td, struct io_u *io_u)
 		sqe->rw_flags = 0;
 		if (o->nowait)
 			sqe->rw_flags |= RWF_NOWAIT;
-		if (td->o.oatomic && io_u->ddir == DDIR_WRITE)
-			sqe->rw_flags |= RWF_ATOMIC;
+		if (io_u->ddir == DDIR_WRITE) {
+			if (td->o.oatomic)
+				sqe->rw_flags |= RWF_ATOMIC;
+			sqe->write_stream = o->write_stream;
+		}
 
 		/*
 		 * Since io_uring can have a submission context (sqthread_poll)
