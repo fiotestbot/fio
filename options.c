@@ -1370,7 +1370,8 @@ static int str_steadystate_cb(void *data, const char *str)
 	long long ll;
 
 	if (td->o.ss_state != FIO_SS_IOPS && td->o.ss_state != FIO_SS_IOPS_SLOPE &&
-	    td->o.ss_state != FIO_SS_BW && td->o.ss_state != FIO_SS_BW_SLOPE) {
+	    td->o.ss_state != FIO_SS_BW && td->o.ss_state != FIO_SS_BW_SLOPE &&
+	    td->o.ss_state != FIO_SS_LAT && td->o.ss_state != FIO_SS_LAT_SLOPE) {
 		/* should be impossible to get here */
 		log_err("fio: unknown steady state criterion\n");
 		return 1;
@@ -1414,6 +1415,21 @@ static int str_steadystate_cb(void *data, const char *str)
 			return 0;
 
 		td->o.ss_limit.u.f = val;
+        } else if (td->o.ss_state & FIO_SS_LAT) {
+                long long tns;
+                if (check_str_time(nr, &tns, 0)) {
+                        log_err("fio: steadystate latency threshold parsing failed\n");
+                        free(nr);
+                        return 1;
+                }
+
+                dprint(FD_PARSE, "set steady state latency threshold to %lld nsec\n", tns);
+                free(nr);
+                if (parse_dryrun())
+                        return 0;
+
+                td->o.ss_limit.u.f = (double) tns;
+
 	} else {	/* bandwidth criterion */
 		if (str_to_decimal(nr, &ll, 1, td, 0, 0)) {
 			log_err("fio: steadystate BW threshold postfix parsing failed\n");
@@ -5489,6 +5505,14 @@ struct fio_option fio_options[FIO_MAX_OPTS] = {
 			    .oval = FIO_SS_BW_SLOPE,
 			    .help = "slope calculated from bandwidth measurements",
 			  },
+                          { .ival = "lat",
+                            .oval = FIO_SS_LAT,
+                            .help = "maximum mean deviation of latency measurements",
+                          },
+                          { .ival = "lat_slope",
+                            .oval = FIO_SS_LAT_SLOPE,
+                            .help = "slope calculated from latency measurements",
+                          },
 		},
 		.category = FIO_OPT_C_GENERAL,
 		.group  = FIO_OPT_G_RUNTIME,
