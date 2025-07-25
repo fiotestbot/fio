@@ -2359,8 +2359,8 @@ print_config "DAOS File System (dfs) Engine" "$dfs"
 if test "$libnfs" != "no" ; then
   if $(pkg-config libnfs > /dev/null 2>&1); then
     libnfs="yes"
-    libnfs_cflags=$(pkg-config --cflags libnfs gnutls)
-    libnfs_libs=$(pkg-config --libs libnfs gnutls)
+    libnfs_cflags=$(pkg-config --cflags libnfs)
+    libnfs_libs=$(pkg-config --libs libnfs)
   else
     if test "$libnfs" = "yes" ; then
       feature_not_found "libnfs" "libnfs"
