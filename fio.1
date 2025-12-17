@@ -497,6 +497,12 @@ thus it will increase the total runtime if a special timeout or
 \fBruntime\fR is specified. When the unit is omitted, the value is
 given in seconds.
 .TP
+.BI ramp_size \fR=\fPsize
+If set, fio will wait until the workload does given amount of IO before
+logging any performance numbers. Similar considerations apply as for
+\fBramp_time\fR option. When the unit is omitted, the value is given in
+megabytes.
+.TP
 .BI clocksource \fR=\fPstr
 Use the given clocksource as the base of timing. The supported options are:
 .RS

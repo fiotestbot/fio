@@ -715,6 +715,13 @@ Time related parameters
 	:option:`runtime` is specified.  When the unit is omitted, the value is
 	given in seconds.
 
+.. option:: ramp_size=size
+
+	If set, fio will wait until the workload does given amount of IO before
+	logging any performance numbers. Similar considerations apply as for
+	``ramp_time`` option. When the unit is omitted, the value is given in
+	megabytes.
+
 .. option:: clocksource=str
 
 	Use the given clocksource as the base of timing. The supported options are:
