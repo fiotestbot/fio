@@ -4601,6 +4601,16 @@ struct fio_option fio_options[FIO_MAX_OPTS] = {
 		.group	= FIO_OPT_G_INVALID,
 	},
 	{
+		.name	= "end_syncfs",
+		.lname	= "End sync FS",
+		.type	= FIO_OPT_BOOL,
+		.off1	= offsetof(struct thread_options, end_syncfs),
+		.help	= "Include sync of FS at the end of job",
+		.def	= "0",
+		.category = FIO_OPT_C_FILE,
+		.group	= FIO_OPT_G_INVALID,
+	},
+	{
 		.name	= "unlink",
 		.lname	= "Unlink file",
 		.type	= FIO_OPT_BOOL,

@@ -1484,6 +1484,13 @@ I/O type
 	If true, :manpage:`fsync(2)` file contents when a write stage has completed.
 	Default: false.
 
+.. option:: end_syncfs=bool
+
+        Equivalent to :option:`end_fsync` but instead of executing
+        :manpage:`fsync(2)` for each file of a write stage, execute
+        :manpage:`syncfs(2)` to synchronize all written files with a single
+        system call when a write stage has completed.  Default: false.
+
 .. option:: fsync_on_close=bool
 
 	If true, fio will :manpage:`fsync(2)` a dirty file on close.  This differs
