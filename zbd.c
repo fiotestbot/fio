@@ -92,12 +92,9 @@ static inline uint64_t zbd_zone_remainder(struct fio_zone_info *z)
  *
  * The caller must hold z->mutex.
  */
-static bool zbd_zone_full(const struct fio_file *f, struct fio_zone_info *z,
-			  uint64_t required)
+static bool zbd_zone_full(const struct fio_file *f, struct fio_zone_info *z)
 {
-	assert((required & 511) == 0);
-
-	return z->has_wp && required > zbd_zone_remainder(z);
+	return z->has_wp && zbd_zone_remainder(z) == 0;
 }
 
 static void zone_lock(struct thread_data *td, const struct fio_file *f,
@@ -623,13 +620,11 @@ out:
 static bool zbd_write_zone_get(struct thread_data *td, const struct fio_file *f,
 			       struct fio_zone_info *z)
 {
-	const uint64_t min_bs = td->o.min_bs[DDIR_WRITE];
-
 	/*
 	 * Skip full zones with data verification enabled because resetting a
 	 * zone causes data loss and hence causes verification to fail.
 	 */
-	if (td->o.verify != VERIFY_NONE && zbd_zone_full(f, z, min_bs))
+	if (td->o.verify != VERIFY_NONE && zbd_zone_full(f, z))
 		return false;
 
 	return __zbd_write_zone_get(td, f, z);
@@ -1507,7 +1502,6 @@ static struct fio_zone_info *zbd_convert_to_write_zone(struct thread_data *td,
 						       struct io_u *io_u,
 						       struct fio_zone_info *zb)
 {
-	const uint64_t min_bs = td->o.min_bs[io_u->ddir];
 	struct fio_file *f = io_u->file;
 	struct zoned_block_device_info *zbdi = f->zbd_info;
 	struct fio_zone_info *z;
@@ -1516,32 +1510,8 @@ static struct fio_zone_info *zbd_convert_to_write_zone(struct thread_data *td,
 	bool wait_zone_write;
 	bool in_flight;
 	bool should_retry = true;
-	bool need_zone_finish;
 
 	assert(is_valid_offset(f, io_u->offset));
-
-	if (zbd_zone_remainder(zb) > 0 && zbd_zone_remainder(zb) < min_bs) {
-		pthread_mutex_lock(&f->zbd_info->mutex);
-		zbd_write_zone_put(td, f, zb);
-		pthread_mutex_unlock(&f->zbd_info->mutex);
-		dprint(FD_ZBD, "%s: finish zone %d\n",
-		       f->file_name, zbd_zone_idx(f, zb));
-		io_u_quiesce(td);
-		zbd_finish_zone(td, f, zb);
-		zone_unlock(zb);
-
-		if (zbd_zone_idx(f, zb) + 1 >= f->max_zone && !td_random(td))
-			return NULL;
-
-		/* Find the next write pointer zone */
-		do {
-			zb++;
-			if (zbd_zone_idx(f, zb) >= f->max_zone)
-				zb = zbd_get_zone(f, f->min_zone);
-		} while (!zb->has_wp);
-
-		zone_lock(td, f, zb);
-	}
 
 	if (zbd_write_zone_get(td, f, zb))
 		return zb;
@@ -1613,7 +1583,7 @@ static struct fio_zone_info *zbd_convert_to_write_zone(struct thread_data *td,
 	/* Both z->mutex and zbdi->mutex are held. */
 
 examine_zone:
-	if (zbd_zone_remainder(z) >= min_bs) {
+	if (zbd_zone_remainder(z) > 0) {
 		pthread_mutex_unlock(&zbdi->mutex);
 		goto out;
 	}
@@ -1679,9 +1649,8 @@ retry:
 
 	/* Only z->mutex is held. */
 
-	/* Check whether the write fits in any of the write target zones. */
+	/* Check write target zones. */
 	pthread_mutex_lock(&zbdi->mutex);
-	need_zone_finish = true;
 	for (i = 0; i < zbdi->num_write_zones; i++) {
 		zone_idx = zbdi->write_zones[i];
 		if (zone_idx < f->min_zone || zone_idx >= f->max_zone)
@@ -1692,10 +1661,8 @@ retry:
 		z = zbd_get_zone(f, zone_idx);
 
 		zone_lock(td, f, z);
-		if (zbd_zone_remainder(z) >= min_bs) {
-			need_zone_finish = false;
+		if (zbd_zone_remainder(z) > 0)
 			goto out;
-		}
 		pthread_mutex_lock(&zbdi->mutex);
 	}
 
@@ -1717,26 +1684,6 @@ retry:
 		zone_lock(td, f, z);
 		goto retry;
 	}
-
-	if (td_random(td) && td->o.verify == VERIFY_NONE && need_zone_finish)
-		/*
-		 * If all open zones have remainder smaller than the block size
-		 * for random write jobs, choose one of the write target zones
-		 * and finish it. When verify is enabled, skip this zone finish
-		 * operation to avoid verify data corruption by overwrite to the
-		 * zone.
-		 */
-		if (zbd_pick_write_zone(f, io_u, &zone_idx)) {
-			pthread_mutex_unlock(&zbdi->mutex);
-			zone_unlock(z);
-			z = zbd_get_zone(f, zone_idx);
-			zone_lock(td, f, z);
-			io_u_quiesce(td);
-			dprint(FD_ZBD, "%s(%s): All write target zones have remainder smaller than block size. Choose zone %d and finish.\n",
-			       __func__, f->file_name, zone_idx);
-			zbd_finish_zone(td, f, z);
-			goto out;
-		}
 
 	pthread_mutex_unlock(&zbdi->mutex);
 
@@ -2213,17 +2160,12 @@ retry_lock:
 			goto eof;
 		}
 
-retry:
 		zb = zbd_convert_to_write_zone(td, io_u, zb);
 		if (!zb) {
 			dprint(FD_IO, "%s: can't convert to write target zone",
 			       f->file_name);
 			goto eof;
 		}
-
-		if (zbd_zone_remainder(zb) > 0 &&
-		    zbd_zone_remainder(zb) < min_bs)
-			goto retry;
 
 		/* Check whether the zone reset threshold has been exceeded */
 		if (td->o.zrf.u.f) {
@@ -2234,7 +2176,7 @@ retry:
 		}
 
 		/* Reset the zone pointer if necessary */
-		if (zb->reset_zone || zbd_zone_full(f, zb, min_bs)) {
+		if (zb->reset_zone || zbd_zone_full(f, zb)) {
 			if (td->o.verify != VERIFY_NONE) {
 				/*
 				 * Unset io-u->file to tell get_next_verify()
@@ -2269,7 +2211,7 @@ retry:
 		}
 
 		/* Make writes occur at the write pointer */
-		assert(!zbd_zone_full(f, zb, min_bs));
+		assert(!zbd_zone_full(f, zb));
 		io_u->offset = zb->wp;
 		if (!is_valid_offset(f, io_u->offset)) {
 			td_verror(td, EINVAL, "invalid WP value");
@@ -2285,21 +2227,16 @@ retry:
 		 */
 		new_len = min((unsigned long long)io_u->buflen,
 			      zbd_zone_capacity_end(zb) - io_u->offset);
-		new_len = new_len / min_bs * min_bs;
+		assert(new_len > 0);
+		if (new_len > min_bs)
+			new_len = new_len / min_bs * min_bs;
 		if (new_len == io_u->buflen)
 			goto accept;
-		if (new_len >= min_bs) {
-			io_u->buflen = new_len;
-			dprint(FD_IO, "Changed length from %u into %llu\n",
-			       orig_len, io_u->buflen);
-			goto accept;
-		}
 
-		td_verror(td, EIO, "zone remainder too small");
-		log_err("zone remainder %lld smaller than min block size %"PRIu64"\n",
-			(zbd_zone_capacity_end(zb) - io_u->offset), min_bs);
-
-		goto eof;
+		io_u->buflen = new_len;
+		dprint(FD_IO, "Changed length from %u into %llu\n",
+		       orig_len, io_u->buflen);
+		goto accept;
 
 	case DDIR_TRIM:
 		/* Check random trim targets a non-empty zone */
