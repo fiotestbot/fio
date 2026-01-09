@@ -1034,7 +1034,14 @@ Target file/device
 				all zones instead of being restricted to a
 				single zone. The :option:`zoneskip` parameter
 				is ignored. :option:`zonerange` and
-				:option:`zonesize` must be identical.
+				:option:`zonesize` must be identical. The option
+				:option:`norandommap` must be set to 1.
+				Otherwise it is automatically set. When the
+				block size is not aligned to the zone size,
+				write operations leave small areas at zone ends.
+				Fio truncates the specified block size to fill
+				the small left areas with write size smaller
+				than the block size.
 				Trim is handled using a zone reset operation.
 				Trim only considers non-empty sequential write
 				required and sequential write preferred zones.

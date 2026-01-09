@@ -809,7 +809,12 @@ starts. The \fBzonecapacity\fR parameter is ignored.
 .B zbd
 Zoned block device mode. I/O happens sequentially in each zone, even if random
 I/O has been selected. Random I/O happens across all zones instead of being
-restricted to a single zone.
+restricted to a single zone. The \fBzoneskip\fR parameter is ignored.
+\fBzonerange\fR and \fBzonesize\fR must be identical. The option
+\fBnorandommap\fR must be set to 1. Otherwise it is automatically set. When the
+block size is not aligned to the zone size, write operations leave small areas
+at zone ends. Fio truncates the specified block size to fill the small left
+areas with write size smaller than the block size.
 Trim is handled using a zone reset operation. Trim only considers non-empty
 sequential write required and sequential write preferred zones.
 .RE
