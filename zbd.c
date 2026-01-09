@@ -360,44 +360,6 @@ static int zbd_reset_zone(struct thread_data *td, struct fio_file *f,
 }
 
 /**
- * zbd_finish_zone - finish the specified zone
- * @td: FIO thread data.
- * @f: FIO file for which to finish a zone
- * @z: Zone to finish.
- *
- * Finish the zone at @offset with open or close status.
- */
-static int zbd_finish_zone(struct thread_data *td, struct fio_file *f,
-			   struct fio_zone_info *z)
-{
-	uint64_t offset = z->start;
-	uint64_t length = f->zbd_info->zone_size;
-	int ret = 0;
-
-	switch (f->zbd_info->model) {
-	case ZBD_HOST_AWARE:
-	case ZBD_HOST_MANAGED:
-		if (td->io_ops && td->io_ops->finish_zone)
-			ret = td->io_ops->finish_zone(td, f, offset, length);
-		else
-			ret = blkzoned_finish_zone(td, f, offset, length);
-		break;
-	default:
-		break;
-	}
-
-	if (ret < 0) {
-		td_verror(td, errno, "finish zone failed");
-		log_err("%s: finish zone at sector %"PRIu64" failed (%d).\n",
-			f->file_name, offset >> 9, errno);
-	} else {
-		z->wp = (z+1)->start;
-	}
-
-	return ret;
-}
-
-/**
  * zbd_reset_zones - Reset a range of zones.
  * @td: fio thread data.
  * @f: fio file for which to reset zones
