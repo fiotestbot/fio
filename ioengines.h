@@ -9,7 +9,7 @@
 #include "zbd_types.h"
 #include "dataplacement.h"
 
-#define FIO_IOOPS_VERSION	39
+#define FIO_IOOPS_VERSION	40
 
 #ifndef CONFIG_DYNAMIC_ENGINES
 #define FIO_STATIC	static
@@ -65,8 +65,6 @@ struct ioengine_ops {
 				  unsigned int *);
 	int (*get_max_active_zones)(struct thread_data *, struct fio_file *,
 				    unsigned int *);
-	int (*finish_zone)(struct thread_data *, struct fio_file *,
-			   uint64_t, uint64_t);
 	int (*fdp_fetch_ruhs)(struct thread_data *, struct fio_file *,
 			      struct fio_ruhs_info *);
 	int option_struct_size;
