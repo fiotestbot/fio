@@ -338,40 +338,6 @@ int blkzoned_reset_wp(struct thread_data *td, struct fio_file *f,
 	return ret;
 }
 
-int blkzoned_finish_zone(struct thread_data *td, struct fio_file *f,
-			 uint64_t offset, uint64_t length)
-{
-	struct blk_zone_range zr = {
-		.sector         = offset >> 9,
-		.nr_sectors     = length >> 9,
-	};
-	int fd, ret = 0;
-
-	/* If the file is not yet opened, open it for this function. */
-	fd = f->fd;
-	if (fd < 0) {
-		fd = open(f->file_name, O_RDWR | O_LARGEFILE);
-		if (fd < 0)
-			return -errno;
-	}
-
-	if (ioctl(fd, BLKFINISHZONE, &zr) < 0) {
-		ret = -errno;
-		/*
-		 * Kernel versions older than 5.5 do not support BLKFINISHZONE
-		 * and return the ENOTTY error code. These old kernels only
-		 * support block devices that close zones automatically.
-		 */
-		if (ret == ENOTTY)
-			ret = 0;
-	}
-
-	if (f->fd < 0)
-		close(fd);
-
-	return ret;
-}
-
 int blkzoned_move_zone_wp(struct thread_data *td, struct fio_file *f,
 			  struct zbd_zone *z, uint64_t length, const char *buf)
 {
