@@ -1507,7 +1507,6 @@ static struct fio_zone_info *zbd_convert_to_write_zone(struct thread_data *td,
 	struct fio_zone_info *z;
 	uint32_t zone_idx, new_zone_idx;
 	int i;
-	bool wait_zone_write;
 	bool in_flight;
 	bool should_retry = true;
 
@@ -1589,28 +1588,9 @@ examine_zone:
 	}
 
 choose_other_zone:
-	/* Check if number of write target zones reaches one of limits. */
-	wait_zone_write =
-		zbdi->num_write_zones == f->max_zone - f->min_zone ||
-		(zbdi->max_write_zones &&
-		 zbdi->num_write_zones == zbdi->max_write_zones) ||
-		(td->o.job_max_open_zones &&
-		 td->num_write_zones == td->o.job_max_open_zones);
-
 	pthread_mutex_unlock(&zbdi->mutex);
 
 	/* Only z->mutex is held. */
-
-	/*
-	 * When number of write target zones reaches to one of limits, wait for
-	 * zone write completion to one of them before trying a new zone.
-	 */
-	if (wait_zone_write) {
-		dprint(FD_ZBD,
-		       "%s(%s): quiesce to remove a zone from write target zones array\n",
-		       __func__, f->file_name);
-		io_u_quiesce(td);
-	}
 
 retry:
 	/*
