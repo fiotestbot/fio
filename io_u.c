@@ -2445,6 +2445,11 @@ void io_u_fill_buffer(struct thread_data *td, struct io_u *io_u,
 	fill_io_buffer(td, io_u->buf, min_write, max_bs);
 }
 
+static int do_syncfs(const struct thread_data *td, struct fio_file *f)
+{
+	return syncfs(f->fd);
+}
+
 static int do_sync_file_range(const struct thread_data *td,
 			      struct fio_file *f)
 {
@@ -2476,9 +2481,11 @@ int do_io_u_sync(const struct thread_data *td, struct io_u *io_u)
 		ret = io_u->xfer_buflen;
 		io_u->error = EINVAL;
 #endif
-	} else if (io_u->ddir == DDIR_SYNC_FILE_RANGE)
+	} else if (io_u->ddir == DDIR_SYNC_FILE_RANGE) {
 		ret = do_sync_file_range(td, io_u->file);
-	else {
+	} else if (io_u->ddir == DDIR_SYNCFS) {
+		ret = do_syncfs(td, io_u->file);
+	} else {
 		ret = io_u->xfer_buflen;
 		io_u->error = EINVAL;
 	}

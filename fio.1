@@ -1284,6 +1284,12 @@ will be done. Default: false.
 If true, \fBfsync\fR\|(2) file contents when a write stage has completed.
 Default: false.
 .TP
+.BI end_syncfs \fR=\fPbool
+Equivalent to \fBend_fsync\fR but instead of executing \fBfsync\fR\|(2) for
+each file of a write stage, execute \fBsyncfs\fR\|(2) to synchronize all
+written files with a single system call when a write stage has completed.
+Default: false.
+.TP
 .BI fsync_on_close \fR=\fPbool
 If true, fio will \fBfsync\fR\|(2) a dirty file on close. This differs
 from \fBend_fsync\fR in that it will happen on every file close, not
