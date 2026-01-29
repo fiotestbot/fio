@@ -1,0 +1,9 @@
+[global]
+bs=4k
+
+[page_fault]
+ioengine=page_fault
+size=2g
+rw=randrw
+rwmixread=50
+verify=crc32c
