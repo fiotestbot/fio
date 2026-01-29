@@ -244,6 +244,7 @@ int convert_thread_options_to_cpu(struct thread_options *o,
 	o->random_center.u.f = fio_uint64_to_double(le64_to_cpu(top->random_center.u.i));
 	o->random_generator = le32_to_cpu(top->random_generator);
 	o->hugepage_size = le32_to_cpu(top->hugepage_size);
+	o->hugepage_delay = le32_to_cpu(top->hugepage_delay);
 	o->rw_min_bs = le64_to_cpu(top->rw_min_bs);
 	o->thinkcycles = le32_to_cpu(top->thinkcycles);
 	o->thinktime = le32_to_cpu(top->thinktime);
@@ -497,6 +498,8 @@ void convert_thread_options_to_net(struct thread_options_pack *top,
 	top->random_center.u.i = __cpu_to_le64(fio_double_to_uint64(o->random_center.u.f));
 	top->random_generator = cpu_to_le32(o->random_generator);
 	top->hugepage_size = cpu_to_le32(o->hugepage_size);
+	top->hugepage_delay = cpu_to_le32(o->hugepage_delay);
+	top->hugepage_delay_pad = 0;
 	top->rw_min_bs = __cpu_to_le64(o->rw_min_bs);
 	top->thinkcycles = cpu_to_le32(o->thinkcycles);
 	top->thinktime = cpu_to_le32(o->thinktime);

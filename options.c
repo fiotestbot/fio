@@ -5502,6 +5502,16 @@ struct fio_option fio_options[FIO_MAX_OPTS] = {
 		.group	= FIO_OPT_G_INVALID,
 	},
 	{
+		.name	= "hugepage_delay",
+		.lname	= "Hugepage delay",
+		.type	= FIO_OPT_INT,
+		.off1	= offsetof(struct thread_options, hugepage_delay),
+		.help	= "For mmap, map with MADV_NOHUGEPAGE then MADV_HUGEPAGE after delay (in ms)",
+		.def	= "0",
+		.category = FIO_OPT_C_GENERAL,
+		.group	= FIO_OPT_G_INVALID,
+	},
+	{
 		.name	= "flow_id",
 		.lname	= "I/O flow ID",
 		.type	= FIO_OPT_INT,

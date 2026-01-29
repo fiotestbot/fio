@@ -1,12 +1,57 @@
 #include "ioengines.h"
 #include "fio.h"
+#include <errno.h>
+#include <pthread.h>
 #include <sys/mman.h>
+#include <time.h>
 
 struct fio_page_fault_data {
     void *mmap_ptr;
     size_t mmap_sz;
     off_t mmap_off;
+#ifdef CONFIG_HAVE_THP
+    pthread_t mmap_thread;
+    pthread_mutex_t mmap_lock;
+    pthread_cond_t mmap_cond;
+    int mmap_thread_exit;
+    int mmap_thread_started;
+    unsigned int hugepage_delay;
+#endif
 };
+
+#ifdef CONFIG_HAVE_THP
+static void *mmap_delay_thread(void *data)
+{
+    struct fio_page_fault_data *fpd = data;
+    struct timespec req;
+    int ret;
+
+    clock_gettime(CLOCK_REALTIME, &req);
+    req.tv_sec += fpd->hugepage_delay / 1000;
+    req.tv_nsec += (fpd->hugepage_delay % 1000) * 1000000;
+    if (req.tv_nsec >= 1000000000) {
+        req.tv_sec++;
+        req.tv_nsec -= 1000000000;
+    }
+
+    pthread_mutex_lock(&fpd->mmap_lock);
+    while (!fpd->mmap_thread_exit) {
+        ret = pthread_cond_timedwait(&fpd->mmap_cond, &fpd->mmap_lock, &req);
+        if (ret == ETIMEDOUT)
+            break;
+    }
+
+    if (!fpd->mmap_thread_exit) {
+        dprint(FD_MEM, "fio: madvising hugepage\n");
+        ret = madvise(fpd->mmap_ptr, fpd->mmap_sz, MADV_HUGEPAGE);
+        if (ret < 0)
+            log_err("fio: madvise hugepage failed: %d\n", errno);
+    }
+    pthread_mutex_unlock(&fpd->mmap_lock);
+
+    return NULL;
+}
+#endif
 
 static int fio_page_fault_init(struct thread_data *td)
 {
@@ -23,6 +68,26 @@ static int fio_page_fault_init(struct thread_data *td)
     {
         free(fpd);
         return 1;
+    }
+
+    if (td->o.hugepage_delay) {
+#ifdef CONFIG_HAVE_THP
+        fpd->hugepage_delay = td->o.hugepage_delay;
+        madvise(fpd->mmap_ptr, fpd->mmap_sz, MADV_NOHUGEPAGE);
+
+        pthread_mutex_init(&fpd->mmap_lock, NULL);
+        pthread_cond_init(&fpd->mmap_cond, NULL);
+        fpd->mmap_thread_exit = 0;
+        if (pthread_create(&fpd->mmap_thread, NULL, mmap_delay_thread, fpd)) {
+            log_err("fio: failed to create mmap delay thread\n");
+            pthread_cond_destroy(&fpd->mmap_cond);
+            pthread_mutex_destroy(&fpd->mmap_lock);
+            fpd->hugepage_delay = 0;
+            fpd->mmap_thread_started = 0;
+        } else {
+            fpd->mmap_thread_started = 1;
+        }
+#endif
     }
 
     FILE_SET_ENG_DATA(td->files[0], fpd);
@@ -73,12 +138,27 @@ static int fio_page_fault_open_file(struct thread_data *td, struct fio_file *f)
 
 static int fio_page_fault_close_file(struct thread_data *td, struct fio_file *f)
 {
-	struct fio_page_fault_data *fpd = FILE_ENG_DATA(f);
-	if (!fpd)
-		return 1;
-    if (fpd->mmap_ptr && fpd->mmap_sz)
-        munmap(fpd->mmap_ptr, fpd->mmap_sz);
-	free(fpd);
+    struct fio_page_fault_data *fpd = FILE_ENG_DATA(f);
+
+    if (fpd) {
+#ifdef CONFIG_HAVE_THP
+        if (fpd->mmap_thread_started) {
+            pthread_mutex_lock(&fpd->mmap_lock);
+            fpd->mmap_thread_exit = 1;
+            pthread_cond_signal(&fpd->mmap_cond);
+            pthread_mutex_unlock(&fpd->mmap_lock);
+            pthread_join(fpd->mmap_thread, NULL);
+            pthread_cond_destroy(&fpd->mmap_cond);
+            pthread_mutex_destroy(&fpd->mmap_lock);
+            fpd->mmap_thread_started = 0;
+        }
+#endif
+
+        if (fpd->mmap_ptr && fpd->mmap_sz)
+            munmap(fpd->mmap_ptr, fpd->mmap_sz);
+        free(fpd);
+    }
+
 	return 0;
 }
 

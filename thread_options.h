@@ -203,6 +203,7 @@ struct thread_options {
 	unsigned int perc_rand[DDIR_RWDIR_CNT];
 
 	unsigned int hugepage_size;
+	unsigned int hugepage_delay;
 	unsigned long long rw_min_bs;
 	unsigned int fsync_blocks;
 	unsigned int fdatasync_blocks;
@@ -540,6 +541,8 @@ struct thread_options_pack {
 	uint32_t perc_rand[DDIR_RWDIR_CNT];
 
 	uint32_t hugepage_size;
+	uint32_t hugepage_delay;
+	uint32_t hugepage_delay_pad;
 	uint64_t rw_min_bs;
 	uint32_t fsync_blocks;
 	uint32_t fdatasync_blocks;
