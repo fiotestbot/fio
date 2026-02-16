@@ -1693,8 +1693,17 @@ retry:
 
 		zone_lock(td, f, z);
 		if (zbd_zone_remainder(z) >= min_bs) {
-			need_zone_finish = false;
-			goto out;
+			/*
+			 * The zone might be already removed from
+			 * zbdi->write_zones[] by other jobs at this moment.
+			 * Even if the zone has remainder, call
+			 * zbd_write_zone_get() to ensure that it is in the
+			 * array.
+			 */
+			if (zbd_write_zone_get(td, f, z)) {
+				need_zone_finish = false;
+				goto out;
+			}
 		}
 		pthread_mutex_lock(&zbdi->mutex);
 	}
