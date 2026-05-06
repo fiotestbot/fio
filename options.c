@@ -1340,6 +1340,54 @@ static int parse_zoned_distribution(struct thread_data *td, const char *input,
 	return ret;
 }
 
+static int parse_sequence_distribution(struct thread_data *td, const char *input)
+{
+	char *str, *p, *n;
+	unsigned int i = 0;
+
+	p = str = get_opt_postfix(input);
+	if (!str) {
+		log_err("fio: missing pattern in sequence distribution\n");
+		return 1;
+	}
+
+	/* Count elements first to allocate memory */
+	td->o.random_sequence_nr = 1;
+	while ((n = strchr(p, ',')) != NULL) {
+		td->o.random_sequence_nr++;
+		p = n + 1;
+	}
+
+	if (td->o.random_sequence) {
+		free(td->o.random_sequence);
+		td->o.random_sequence = NULL;
+	}
+
+	td->o.random_sequence = malloc(td->o.random_sequence_nr * sizeof(unsigned int));
+	if (!td->o.random_sequence) {
+		free(str);
+		return 1;
+	}
+
+	p = str;
+	while ((n = strsep(&p, ",")) != NULL) {
+		if (*n == '\0') {
+			log_err("fio: empty element in random_sequence\n");
+			goto err;
+		}
+		td->o.random_sequence[i++] = atoi(n);
+	}
+
+	free(str);
+	return 0;
+err:
+	free(td->o.random_sequence);
+	td->o.random_sequence = NULL;
+	td->o.random_sequence_nr = 0;
+	free(str);
+	return 1;
+}
+
 static int str_random_distribution_cb(void *data, const char *str)
 {
 	struct thread_data *td = cb_data_to_td(data);
@@ -1357,6 +1405,8 @@ static int str_random_distribution_cb(void *data, const char *str)
 		return parse_zoned_distribution(td, str, false);
 	else if (td->o.random_distribution == FIO_RAND_DIST_ZONED_ABS)
 		return parse_zoned_distribution(td, str, true);
+	else if (td->o.random_distribution == FIO_RAND_DIST_SEQUENCE)
+		return parse_sequence_distribution(td, str);
 	else
 		return 0;
 
@@ -1403,6 +1453,9 @@ static int str_random_distribution_cb(void *data, const char *str)
 
 	return 0;
 }
+
+
+
 
 static bool is_valid_steadystate(unsigned int state)
 {
@@ -2811,7 +2864,21 @@ struct fio_option fio_options[FIO_MAX_OPTS] = {
 			    .oval = FIO_RAND_DIST_ZONED_ABS,
 			    .help = "Zoned absolute random distribution",
 			  },
+			  { .ival = "sequence",
+			    .oval = FIO_RAND_DIST_SEQUENCE,
+			    .help = "Fixed sequence of blocks",
+			  },
 		},
+		.category = FIO_OPT_C_IO,
+		.group	= FIO_OPT_G_RANDOM,
+	},
+	{
+		.name	= "random_sequence_stride",
+		.lname	= "Random Sequence Stride",
+		.type	= FIO_OPT_BOOL,
+		.off1	= offsetof(struct thread_options, random_sequence_stride),
+		.help	= "Stride sequence of blocks for random distribution",
+		.def	= "0",
 		.category = FIO_OPT_C_IO,
 		.group	= FIO_OPT_G_RANDOM,
 	},
@@ -6151,6 +6218,18 @@ void fio_options_mem_dupe(struct thread_data *td)
 {
 	options_mem_dupe(fio_options, &td->o);
 
+	if (td->o.random_sequence) {
+		unsigned int size = td->o.random_sequence_nr * sizeof(unsigned int);
+		unsigned int *seq = malloc(size);
+		if (seq) {
+			memcpy(seq, td->o.random_sequence, size);
+			td->o.random_sequence = seq;
+		} else {
+			td->o.random_sequence = NULL;
+			td->o.random_sequence_nr = 0;
+		}
+	}
+
 	if (td->o.ioengine_so_path)
 		td->o.ioengine_so_path = strdup(td->o.ioengine_so_path);
 
@@ -6263,6 +6342,11 @@ void del_opt_posval(const char *optname, const char *ival)
 void fio_options_free(struct thread_data *td)
 {
 	options_free(fio_options, &td->o);
+	if (td->o.random_sequence) {
+		free(td->o.random_sequence);
+		td->o.random_sequence = NULL;
+		td->o.random_sequence_nr = 0;
+	}
 	if (td->o.ioengine_so_path) {
 		free(td->o.ioengine_so_path);
 		td->o.ioengine_so_path = NULL;
